@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdbool.h>
 #include <netdb.h>
 #include "list.h"
 #include <stdio.h>
