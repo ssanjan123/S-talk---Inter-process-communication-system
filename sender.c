@@ -21,8 +21,8 @@ static pthread_cond_t  itemAvail = PTHREAD_COND_INITIALIZER;
 static int socketDescriptor = 0 ;
 static int REMOTEPORT = 0;
 static char* REMOTEIP = NULL;
-static List* send_list = NULL;
-static List* receive_list = NULL;
+static LIST* send_list = NULL;
+static LIST* receive_list = NULL;
 static char* messageRx = NULL;
 //for receiving
 static pthread_t *receiverPID;
@@ -51,7 +51,7 @@ void *sendThread(void *unused)
     end[strlen(end)] = '\0';
 
     while (1){
-        if (List_count(send_list) <= 0)
+        if (ListCount(send_list) <= 0)
         {
             pthread_mutex_lock(&itemAvailMutex);
             {
@@ -62,7 +62,7 @@ void *sendThread(void *unused)
 
         pthread_mutex_lock(localMutex);
         {
-            messageRx = List_trim(send_list);
+            messageRx = ListTrim(send_list);
         }
         pthread_mutex_unlock(localMutex);
         
@@ -75,8 +75,8 @@ void *sendThread(void *unused)
         bool end2 =(messageRx[strlen(messageRx)-1] == 'n' && messageRx[strlen(messageRx)-2] == 92 && messageRx[0] == '!') && strlen(messageRx) == 3 ;
 
         if(strcmp(messageRx, end) == 0 || end2){  //messagerx has to be coreect dynamic index
-            List_free(send_list, free_item1);
-            List_free(receive_list, free_item1);
+            ListFree(send_list, free_item1);
+            ListFree(receive_list, free_item1);
             keyboard_shutdown();
             //Screen_shutdown();
             pthread_cancel(*printerPID);
@@ -96,7 +96,7 @@ void *sendThread(void *unused)
     return NULL;
 }
 
-void Sender_init(int socketDescriptors,char* REMOTEIPs,int REMOTEPORTs,List* send_list_param,List* receive_list_param, pthread_mutex_t *localMutex_param,pthread_mutex_t *RMutex_param,pthread_cond_t *RAvail_param,pthread_t *receivePID,pthread_t *printPID){
+void Sender_init(int socketDescriptors,char* REMOTEIPs,int REMOTEPORTs,LIST* send_list_param,LIST* receive_list_param, pthread_mutex_t *localMutex_param,pthread_mutex_t *RMutex_param,pthread_cond_t *RAvail_param,pthread_t *receivePID,pthread_t *printPID){
     localMutex = localMutex_param;
     send_list = send_list_param;
     receive_list = receive_list_param;

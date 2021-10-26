@@ -20,8 +20,8 @@ static pthread_mutex_t *producersMutex;
 static pthread_mutex_t bufAvailMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvail = PTHREAD_COND_INITIALIZER;
 
-static List* send_list;
-static List* receive_list;
+static LIST* send_list;
+static LIST* receive_list;
 
 static char* messageRx = NULL; 
  //remeber has to be dynamically allocated otherwise does not make sense
@@ -34,7 +34,7 @@ void *keyboardThread(void *unused)
         messageRx[strlen(messageRx)-1] = '\0';
         pthread_mutex_lock(producersMutex);
         {
-            if (List_count(send_list) + List_count(receive_list) == 100){
+            if (ListCount(send_list) + ListCount(receive_list) == 100){
                     pthread_mutex_lock(&bufAvailMutex);
                     {
                         pthread_cond_wait(&bufAvail,&bufAvailMutex);
@@ -47,7 +47,7 @@ void *keyboardThread(void *unused)
         pthread_mutex_lock(localMutex);
         {
 
-            List_prepend(send_list,messageRx);
+            ListPrepend(send_list,messageRx);
         }
         pthread_mutex_unlock(localMutex); 
         signal_consumer_sender();
@@ -56,7 +56,7 @@ void *keyboardThread(void *unused)
     return NULL;
 }
 
-void keyboard_init(List* send_list_param,List* receive_list_param,pthread_mutex_t *localMutex_param,pthread_mutex_t *producersMutex_param){
+void keyboard_init(LIST* send_list_param,LIST* receive_list_param,pthread_mutex_t *localMutex_param,pthread_mutex_t *producersMutex_param){
     localMutex = localMutex_param;
     producersMutex = producersMutex_param;
     send_list = send_list_param;
