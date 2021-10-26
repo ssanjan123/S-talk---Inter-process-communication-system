@@ -1,131 +1,106 @@
-// List data type
-// You may modify this file as needed; however,
-// you may *NOT* modify the function prototypes or constant names.
-
+/* file: list.h
+   Header file for the list concrete data structure*/
 #ifndef _LIST_H_
 #define _LIST_H_
-#include <stdbool.h>
 
-#define LIST_SUCCESS 0
-#define LIST_FAIL -1
 
-typedef struct Node_s Node;
-struct Node_s {
-    void* item;
-    int pool_index;
-    Node* next;
-    Node* previous;
-};
+/*define the head-nodes*/
 
-enum ListOutOfBounds {
-    LIST_OOB_START,
-    LIST_OOB_END
-};
-typedef struct List_s List;
-struct List_s{
-    Node *head;
-    Node *tail;
-    Node *current;
-    bool before_start;
-    bool after_end;
-    int pool_index;
-    int length;
-    
-};
+typedef struct {
+  int next; /* pos of the next head node whether free or not */
+  int prev; /* pos of the prev head node whether free or not */ 
+  int position; /* pos of the head node */
+ 
+  int first;     /* pos to the firstnode*/
+  int current;    /* pos to the current node*/
+  int last;   /* pos to the last node*/
+  void* curitem; /* pointer to the current item*/
+  int mynodes;          /* number of the nodes in the list*/
+} LIST;
 
-// Maximum number of unique lists the system can support
-// (You may modify for your needs)
-#define LIST_MAX_NUM_HEADS 10
+/*define the nodes of list*/
 
-// Maximum total number of nodes (statically allocated) to be shared across all lists
-// (You may modify for your needs)
-#define LIST_MAX_NUM_NODES 100
-// General Error Handling:
-// Client code is assumed never to call these functions with a NULL List pointer, or 
-// bad List pointer. If it does, any behaviour is permitted (such as crashing).
-// HINT: Use assert(pList != NULL); just to add a nice check, but not required.
-// Makes a new, empty list, and returns its reference on success. 
-// Returns a NULL pointer on failure.
-List* List_create();
+typedef struct {
+  void* item ;  /* the item to be stored*/
+  int next;   /* the pos to the next node either free or node in list*/
+  int prev;    /* the pos to the prev node either free or node in list*/
+} node;
 
-// Returns the number of items in pList.
-int List_count(List* pList);
+LIST *ListCreate();
+/* PRE: none
+   POST: if space is available, an empty list is made and a pointer to it, is returned or returns 
+   null.*/
 
-// Returns a pointer to the first item in pList and makes the first item the current item.
-// Returns NULL and sets current item to NULL if list is empty.
-void* List_first(List* pList);
+int ListCount(LIST* somelist);
+/* PRE: somelist is a valid list type structure.
+   POST: returns the number of items in list.*/
 
-// Returns a pointer to the last item in pList and makes the last item the current item.
-// Returns NULL and sets current item to NULL if list is empty.
-void* List_last(List* pList); 
+void *ListFirst(LIST* somelist);
+/*PRE: somelist is a valid list type structure.
+  POST: returns a pointer to the first item in list and makes the first item the current item.*/
 
-// Advances pList's current item by one, and returns a pointer to the new current item.
-// If this operation advances the current item beyond the end of the pList, a NULL pointer 
-// is returned and the current item is set to be beyond end of pList.
-void* List_next(List* pList);
+void *ListLast(LIST* somelist);
+/*PRE: somelist is a valid list type structure.
+  POST: returns a pointer to the last item in list and makes the last item the current item.*/
 
-// Backs up pList's current item by one, and returns a pointer to the new current item. 
-// If this operation backs up the current item beyond the start of the pList, a NULL pointer 
-// is returned and the current item is set to be before the start of pList.
-void* List_prev(List* pList);
+void *ListNext(LIST* somelist);
+/*PRE: somelist is a valid list type structure.
+  POST:  advances list's current item by one, and returns a pointer to the new current
+         item. If this operation advances the current item beyond the end of the list, a NULL
+         pointer is returned. */
 
-// Returns a pointer to the current item in pList.
-void* List_curr(List* pList);
+void *ListPrev(LIST* somelist);
+/*PRE: somelist is a valid list type structure.
+  POST: backs up list's current item by one, and returns a pointer to the new current
+        item. If this operation backs up the current item beyond the start of the list, a NULL
+        pointer is returned. */
 
-// Adds the new item to pList directly after the current item, and makes item the current item. 
-// If the current pointer is before the start of the pList, the item is added at the start. If 
-// the current pointer is beyond the end of the pList, the item is added at the end. 
-// Returns 0 on success, -1 on failure.
-int List_add(List* pList, void* pItem);
+void *ListCurr(LIST* somelist);
+/*PRE: somelist is a valid list type structure.
+  POST: returns a pointer to the current item in list. */
 
-// Adds item to pList directly before the current item, and makes the new item the current one. 
-// If the current pointer is before the start of the pList, the item is added at the start. 
-// If the current pointer is beyond the end of the pList, the item is added at the end. 
-// Returns 0 on success, -1 on failure.
-int List_insert(List* pList, void* pItem);
+int ListAdd(LIST* somelist, void* item);
+/*PRE: somelist is a valid list type structure and item is valid also.
+  POST: adds the new item to list directly after the current item, and makes item the current item.
+        If the current pointer is before the start of the list, the item is added at the start.
+        If the current pointer is beyond the end of the list, the item is added at the end.
+        Returns 0 on success, -1 on failure. */
 
-// Adds item to the end of pList, and makes the new item the current one. 
-// Returns 0 on success, -1 on failure.
-int List_append(List* pList, void* pItem);
+int ListInsert(LIST* somelist, void* item);
+/*PRE: somelist is a valid list type structure and item is valid also.
+  POST: adds item to list directly before the current item, and makes the new item
+        the current one. If the current pointer is before the start of the list, the item is added at the 
+        start. If the current pointer is beyond the end of the list, the item is added at the end.
+        Returns 0 on success, -1 on failure. */
 
-// Adds item to the front of pList, and makes the new item the current one. 
-// Returns 0 on success, -1 on failure.
-int List_prepend(List* pList, void* pItem);
+int ListAppend(LIST* somelist, void* item);
+/*PRE: somelist is a valid list type structure and item is valid also.
+  POST: adds item to the end of list, and makes the new item the current one.
+  Returns 0 on success, -1 on failure. */
 
-// Return current item and take it out of pList. Make the next item the current one.
-// If the current pointer is before the start of the pList, or beyond the end of the pList,
-// then do not change the pList and return NULL.
-void* List_remove(List* pList);
+int ListPrepend(LIST* somelist, void* item);
+/*PRE: somelist is a valid list type structure and item is valid also.
+  POST: adds item to the front of list, and makes the new item the current one.
+  Returns 0 on success, -1 on failure. */
 
-// Adds pList2 to the end of pList1. The current pointer is set to the current pointer of pList1. 
-// pList2 no longer exists after the operation; its head is available
-// for future operations.
-void List_concat(List* pList1, List* pList2);
+void *ListRemove(LIST* somelist);
+/*PRE: list is a valid list type structure.
+  POST: Return current item and take it out of list. Make the next item the current one.*/
 
-// Delete pList. pItemFreeFn is a pointer to a routine that frees an item. 
-// It should be invoked (within List_free) as: (*pItemFreeFn)(itemToBeFreedFromNode);
-// pList and all its nodes no longer exists after the operation; its head and nodes are 
-// available for future operations.
-typedef void (*FREE_FN)(void* pItem);
-void List_free(List* pList, FREE_FN pItemFreeFn);
+void ListConcat(LIST* somelist, LIST* someotherlist);
+/*PRE: somelist and someotherlist are valid list type structures.
+  POST: adds list2 to the end of list1. The current pointer is set to the current
+  pointer of list1. List2 no longer exists after the operation. */
 
-// Return last item and take it out of pList. Make the new last item the current one.
-// Return NULL if pList is initially empty.
-void* List_trim(List* pList);
+void ListFree(LIST* somelist, void (*itemfree)() );
+/*PRE: somelist is a valid list type structure and item is also valid.
+  POST: delete list. */
 
-// Search pList, starting at the current item, until the end is reached or a match is found. 
-// In this context, a match is determined by the comparator parameter. This parameter is a
-// pointer to a routine that takes as its first argument an item pointer, and as its second 
-// argument pComparisonArg. Comparator returns 0 if the item and comparisonArg don't match, 
-// or 1 if they do. Exactly what constitutes a match is up to the implementor of comparator. 
-// 
-// If a match is found, the current pointer is left at the matched item and the pointer to 
-// that item is returned. If no match is found, the current pointer is left beyond the end of 
-// the list and a NULL pointer is returned.
-// 
-// If the current pointer is before the start of the pList, then start searching from
-// the first node in the list (if any).
-typedef bool (*COMPARATOR_FN)(void* pItem, void* pComparisonArg);
-void* List_search(List* pList, COMPARATOR_FN pComparator, void* pComparisonArg);
+void *ListTrim(LIST* somelist);
+/*PRE: somelist is a valid list type structure
+  POST: Return last item and take it out of list. Make the new last item the current one. */
 
+void *ListSearch(LIST* somelist, int (*comparator)() , void* comparisonArg);
+/*PRE: somelist is a valid list type structure and also the comparator and comparisonArg are valid types.
+  POST: searches list starting at the current item until the end is reached or a match is found. */
 #endif
