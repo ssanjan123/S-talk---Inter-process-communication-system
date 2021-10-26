@@ -139,6 +139,8 @@ void *keyboardThread2(void *unused)
     while (1){
         messageRec = malloc(MSG_MAX_LEN);
         fgets(messageRec,MSG_MAX_LEN, stdin); //messagerx has to be coreect dynamic index
+
+        //
         messageRec[strlen(messageRec)-1] = '\0';
         pthread_mutex_lock(&onMutex);
         {
@@ -238,7 +240,7 @@ int main(int argc, char **args)
     
 
     //keyboard_init(outMsg,inMsg,&outMutex,&onMutex);
-    pthread_create(&keyboardPID, NULL, &keyboardThread2, NULL);
+    pthread_create(&keyboardPID, NULL, keyboardThread2, NULL);
 
     Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR,&bufAvailR,&receivePID,&printPID, &keyboardPID, &bufMutexB, &bufAvailB);
     //Receiver_init(sDr,outMsg,inMsg,&inMutex,&onMutex);
