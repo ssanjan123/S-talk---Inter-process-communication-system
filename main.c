@@ -1,11 +1,11 @@
 #include <stdlib.h>
 #include <netdb.h>
-#include "list.h"
+//#include "list.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include "keyboard.h"
+//#include "keyboard.h"
 #include "sender.h"
 //#include "screen.h"
 //#include "receiver.h"
@@ -24,9 +24,9 @@ LIST *outMsg;
 LIST *inMsg;
 
 
-pthread_mutex_t outMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t inMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t onMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t outMutex = PTHREAD_MUTEX_INITIALIZER; // local
+pthread_mutex_t inMutex = PTHREAD_MUTEX_INITIALIZER; // remote
+pthread_mutex_t onMutex = PTHREAD_MUTEX_INITIALIZER; // producer
 
 static char* messageRec = NULL;
 //For Receiving
@@ -38,6 +38,14 @@ static pthread_cond_t  bufAvailR = PTHREAD_COND_INITIALIZER;
 static pthread_t printPID;
 static pthread_mutex_t bufMutexP = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailP = PTHREAD_COND_INITIALIZER;
+
+//For Reading
+static pthread_t keyboardPID;
+
+// static pthread_mutex_t *localMutex;
+// static pthread_mutex_t *producersMutex;
+static pthread_mutex_t bufMutexB = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  bufAvailB = PTHREAD_COND_INITIALIZER;
 
 void freeHelper(void *item){
     free(item);
@@ -56,16 +64,21 @@ void* printThread(){
         pthread_mutex_lock(&bufMutexR);
         pthread_cond_signal(&bufAvailR);
         pthread_mutex_unlock(&bufMutexR);
-        signal_producer_keyboard();
+
+        pthread_mutex_lock(&bufMutexB);
+        pthread_cond_signal(&bufAvailB);
+        pthread_mutex_unlock(&bufMutexB);
+        //signal_producer_keyboard();
         puts(messageRec);
 
         //End condition
         if(strcmp(messageRec,"!") == 0){
             ListFree(outMsg,freeHelper);
             ListFree(inMsg,freeHelper);
-            keyboard_shutdown();
+            //keyboard_shutdown();
             Sender_shutdown();
             //Receiver_shutdown();
+            pthread_cancel(keyboardPID);
             pthread_cancel(receivePID);
             pthread_cancel(printPID);
 
@@ -118,6 +131,36 @@ void* receiveThread(){
 
     }
 
+    return NULL;
+}
+
+void *keyboardThread2(void *unused)
+{
+    while (1){
+        messageRec = malloc(MSG_MAX_LEN);
+        fgets(messageRec,MSG_MAX_LEN, stdin); //messagerx has to be coreect dynamic index
+        messageRec[strlen(messageRec)-1] = '\0';
+        pthread_mutex_lock(&onMutex);
+        {
+            if (ListCount(outMsg) + ListCount(inMsg) == 100){ // recieve_list = inmSG
+                    pthread_mutex_lock(&bufMutexB);
+                    {
+                        pthread_cond_wait(&bufAvailB,&bufMutexB);
+                    }
+                    pthread_mutex_unlock(&bufMutexB);
+            }
+        }
+        pthread_mutex_unlock(&onMutex);// producer
+
+        pthread_mutex_lock(&outMutex);
+        {
+
+            ListPrepend(outMsg,messageRec);
+        }
+        pthread_mutex_unlock(&outMutex); 
+        signal_consumer_sender();
+        
+    }
     return NULL;
 }
 
@@ -194,15 +237,27 @@ int main(int argc, char **args)
     
     
 
-    keyboard_init(outMsg,inMsg,&outMutex,&onMutex);
-    Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR,&bufAvailR,&receivePID,&printPID);
+    //keyboard_init(outMsg,inMsg,&outMutex,&onMutex);
+    pthread_create(&keyboardPID, NULL, &keyboardThread2, NULL);
+
+    Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR,&bufAvailR,&receivePID,&printPID, &keyboardPID, &bufMutexB, &bufAvailB);
     //Receiver_init(sDr,outMsg,inMsg,&inMutex,&onMutex);
     pthread_create(&receivePID,NULL,receiveThread,NULL);
     pthread_create(&printPID,NULL,printThread,NULL);
     //Screen_init(sDr,outMsg,inMsg,&inMutex,&bufMutexR,&bufAvailR,&receivePID);
 
-    keyboard_wait_to_finish();
-    Sender_wait_to_finish();
+
+     //Keyboard_wait_to_finish();
+    pthread_join(keyboardPID,NULL);
+    pthread_mutex_destroy(&bufMutexB);
+    pthread_cond_destroy(&bufAvailB);
+    if(messageRec != NULL){
+        free(messageRec);
+        messageRec = NULL;
+    }
+
+
+    Sender_wait_to_finish(); // TODO:
     //Receiver_wait_to_finish();
     pthread_join(receivePID,NULL);
     pthread_mutex_destroy(&bufMutexR);

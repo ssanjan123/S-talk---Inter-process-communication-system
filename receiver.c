@@ -17,11 +17,11 @@ static int socketDescriptor;
 
 static pthread_mutex_t *remoteMutex;
 static pthread_mutex_t *producersMutex;
-static pthread_mutex_t bufAvailMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  bufAvail = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t bufMutexB = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  bufAvailB = PTHREAD_COND_INITIALIZER;
 
-static List* send_list;
-static List* receive_list;
+static LIST* send_list;
+static LIST* receive_list;
 
 static char* messageRx = NULL; 
 
@@ -41,11 +41,11 @@ void *receiverThread(void *unused)
         pthread_mutex_lock(producersMutex);
         {
             if (List_count(send_list) + List_count(receive_list) == 100){
-                    pthread_mutex_lock(&bufAvailMutex);
+                    pthread_mutex_lock(&bufMutexB);
                     {
-                        pthread_cond_wait(&bufAvail,&bufAvailMutex);
+                        pthread_cond_wait(&bufAvailB,&bufMutexB);
                     }
-                    pthread_mutex_unlock(&bufAvailMutex);
+                    pthread_mutex_unlock(&bufMutexB);
             }
         }
         pthread_mutex_unlock(producersMutex);
@@ -61,7 +61,7 @@ void *receiverThread(void *unused)
     return NULL;
 }
 
-void Receiver_init(int socketDescriptor_param,List* send_list_param,List* receive_list_param,pthread_mutex_t *remoteMutex_param,pthread_mutex_t *producersMutex_param){
+void Receiver_init(int socketDescriptor_param,LIST* send_list_param,LIST* receive_list_param,pthread_mutex_t *remoteMutex_param,pthread_mutex_t *producersMutex_param){
     socketDescriptor = socketDescriptor_param;
     remoteMutex = remoteMutex_param;
     producersMutex = producersMutex_param;
@@ -80,8 +80,8 @@ void Receiver_shutdown(void){
 
 void Receiver_wait_to_finish(void){
     pthread_join(receiverPID, NULL);
-    pthread_mutex_destroy(&bufAvailMutex);
-    pthread_cond_destroy(&bufAvail);
+    pthread_mutex_destroy(&bufMutexB);
+    pthread_cond_destroy(&bufAvailB);
     if(messageRx){
     free(messageRx);
     messageRx = NULL;
@@ -90,9 +90,9 @@ void Receiver_wait_to_finish(void){
 
 void signal_producer_receiver()
 {
-    pthread_mutex_lock(&bufAvailMutex);
+    pthread_mutex_lock(&bufMutexB);
     {
-        pthread_cond_signal(&bufAvail);
+        pthread_cond_signal(&bufAvailB);
     }
-    pthread_mutex_unlock(&bufAvailMutex);
+    pthread_mutex_unlock(&bufMutexB);
 }

@@ -3,11 +3,12 @@
 #include <netdb.h>
 #include "list.h"
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h> 
-#include "keyboard.h"
+//#include "keyboard.h"
 #include "sender.h"
 //#include "screen.h"
 //#include "receiver.h"
@@ -33,6 +34,10 @@ static pthread_cond_t  *TbufAvailR;
 static pthread_t *printerPID;
 //static pthread_mutex_t *TbufMutexP;
 //static pthread_cond_t  *TbufAvailP;
+
+static pthread_t *keyboardPID;
+static pthread_mutex_t *bufMutexB;
+static pthread_cond_t  *bufAvailB;
 
 void free_item1(void *pItem)
 {
@@ -78,7 +83,8 @@ void *sendThread(void *unused)
         if(strcmp(messageRx, end) == 0 || end2){  //messagerx has to be coreect dynamic index
             ListFree(send_list, free_item1);
             ListFree(receive_list, free_item1);
-            keyboard_shutdown();
+            //keyboard_shutdown();
+            pthread_cancel(*keyboardPID);
             //Screen_shutdown();
             pthread_cancel(*printerPID);
             //Receiver_shutdown();
@@ -87,7 +93,12 @@ void *sendThread(void *unused)
         }
         free(messageRx);
         messageRx = NULL;
-        signal_producer_keyboard();
+        //signal_producer_keyboard();
+        pthread_mutex_lock(bufMutexB);
+        pthread_cond_signal(bufAvailB);
+        pthread_mutex_unlock(bufMutexB);
+
+
         pthread_mutex_lock(TbufMutexR);
         pthread_cond_signal(TbufAvailR);
         pthread_mutex_unlock(TbufMutexR);
@@ -97,7 +108,9 @@ void *sendThread(void *unused)
     return NULL;
 }
 
-void Sender_init(int socketDescriptors,char* REMOTEIPs,int REMOTEPORTs,LIST* send_list_param,LIST* receive_list_param, pthread_mutex_t *localMutex_param,pthread_mutex_t *RMutex_param,pthread_cond_t *RAvail_param,pthread_t *receivePID,pthread_t *printPID){
+void Sender_init(int socketDescriptors,char* REMOTEIPs,int REMOTEPORTs,LIST* send_list_param,LIST* receive_list_param, 
+                pthread_mutex_t *localMutex_param,pthread_mutex_t *RMutex_param,pthread_cond_t *RAvail_param,pthread_t *receivePID,
+                pthread_t *printPID, pthread_t *keyboardPID1, pthread_mutex_t *BMutex_param,pthread_cond_t *BAvail_param){
     localMutex = localMutex_param;
     send_list = send_list_param;
     receive_list = receive_list_param;
@@ -108,6 +121,9 @@ void Sender_init(int socketDescriptors,char* REMOTEIPs,int REMOTEPORTs,LIST* sen
     TbufMutexR = RMutex_param;
     receiverPID = receivePID;
     printerPID = printPID;
+    keyboardPID = keyboardPID1;
+    bufAvailB = BAvail_param;
+    bufMutexB = BMutex_param;
     pthread_create(
         &senderPID, 
         NULL,       

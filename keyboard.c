@@ -17,8 +17,8 @@ static pthread_t keyboardPID;
 
 static pthread_mutex_t *localMutex;
 static pthread_mutex_t *producersMutex;
-static pthread_mutex_t bufAvailMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  bufAvail = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t bufMutexB = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  bufAvailB = PTHREAD_COND_INITIALIZER;
 
 static LIST* send_list;
 static LIST* receive_list;
@@ -35,11 +35,11 @@ void *keyboardThread(void *unused)
         pthread_mutex_lock(producersMutex);
         {
             if (ListCount(send_list) + ListCount(receive_list) == 100){
-                    pthread_mutex_lock(&bufAvailMutex);
+                    pthread_mutex_lock(&bufMutexB);
                     {
-                        pthread_cond_wait(&bufAvail,&bufAvailMutex);
+                        pthread_cond_wait(&bufAvailB,&bufMutexB);
                     }
-                    pthread_mutex_unlock(&bufAvailMutex);
+                    pthread_mutex_unlock(&bufMutexB);
             }
         }
         pthread_mutex_unlock(producersMutex);
@@ -76,8 +76,8 @@ void keyboard_shutdown(void){
 
 void keyboard_wait_to_finish(void){
     pthread_join(keyboardPID,NULL);
-    pthread_mutex_destroy(&bufAvailMutex);
-    pthread_cond_destroy(&bufAvail);
+    pthread_mutex_destroy(&bufMutexB);
+    pthread_cond_destroy(&bufAvailB);
     if(messageRx){
         free(messageRx);
         messageRx = NULL;
@@ -86,9 +86,9 @@ void keyboard_wait_to_finish(void){
 
 void signal_producer_keyboard()
 {
-    pthread_mutex_lock(&bufAvailMutex);
+    pthread_mutex_lock(&bufMutexB);
     {
-        pthread_cond_signal(&bufAvail);
+        pthread_cond_signal(&bufAvailB);
     }
-    pthread_mutex_unlock(&bufAvailMutex);
+    pthread_mutex_unlock(&bufMutexB);
 }
