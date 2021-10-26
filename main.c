@@ -20,8 +20,8 @@ static int LOCALPORT;
 static int REMOTEPORT;
 static char* REMOTEIP;
 int sDr;
-List *outMsg;
-List *inMsg;
+LIST *outMsg;
+LIST *inMsg;
 
 
 pthread_mutex_t outMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -44,13 +44,13 @@ void freeHelper(void *item){
 }
 void* printThread(){
     while(1){
-        if(List_count(inMsg) <= 0){
+        if(ListCount(inMsg) <= 0){
             pthread_mutex_lock(&bufMutexP);
             pthread_cond_wait(&bufAvailP,&bufMutexP);
             pthread_mutex_unlock(&bufMutexP);
         }
         pthread_mutex_lock(&inMutex);
-        messageRec = List_trim(inMsg);
+        messageRec = ListTrim(inMsg);
         pthread_mutex_unlock(&inMutex);
         //Signalling Receiver
         pthread_mutex_lock(&bufMutexR);
@@ -61,8 +61,8 @@ void* printThread(){
 
         //End condition
         if(strcmp(messageRec,"!") == 0){
-            List_free(outMsg,freeHelper);
-            List_free(inMsg,freeHelper);
+            ListFree(outMsg,freeHelper);
+            ListFree(inMsg,freeHelper);
             keyboard_shutdown();
             Sender_shutdown();
             //Receiver_shutdown();
@@ -99,7 +99,7 @@ void* receiveThread(){
 
         //Critical section for receive
         pthread_mutex_lock(&onMutex);
-        if((List_count(outMsg) + List_count(inMsg)) == LIST_MAX_SIZE){
+        if((ListCount(outMsg) + ListCount(inMsg)) == LIST_MAX_SIZE){
             pthread_mutex_lock(&bufMutexR);
             pthread_cond_wait(&bufAvailR,&bufMutexR);
             pthread_mutex_unlock(&bufMutexR);
@@ -107,7 +107,7 @@ void* receiveThread(){
         pthread_mutex_unlock(&onMutex);
 
         pthread_mutex_lock(&inMutex);
-        List_prepend(inMsg,messageRec);
+        ListPrepend(inMsg,messageRec);
         pthread_mutex_unlock(&inMutex);
 
         //Signalling Print    
@@ -189,8 +189,8 @@ int main(int argc, char **args)
     getIp(remoteIp,remotePort);
     bindSocket();
 
-    outMsg = List_create();
-    inMsg = List_create();
+    outMsg = ListCreate();
+    inMsg = ListCreate();
     
     
 
