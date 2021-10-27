@@ -281,8 +281,8 @@ int main(int argc, char **argv)
 {
     
     myPort = atoi(argv[1]);
-    their
-    //Sets the IP to a value thatPort = atoi(argv[3]);
+    theirPort = atoi(argv[3]);
+    //Sets the IP to a value that corresponds to the machine name
     setIP(argv[2],argv[3]);
     bindSocket();
 
