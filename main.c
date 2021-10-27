@@ -110,7 +110,8 @@ void* receiveThread(){
         }
 
         //NULL terminate the message received
-        messageRec[strlen(messageRec)] = '\0'; // test
+        ///////////////////////////messageRec[strlen(messageRec)] = '\0'; 
+        messageRec[bytes] = '\0';
 
         //Critical section for receive
         pthread_mutex_lock(&onMutex);
@@ -122,8 +123,9 @@ void* receiveThread(){
         pthread_mutex_unlock(&onMutex);
 
         pthread_mutex_lock(&inMutex);
-        ListPrepend(outMsg,messageRec);// was inMsg instead of outMsg
+        ListPrepend(inMsg,messageRec);// was inMsg instead of outMsg
         pthread_mutex_unlock(&inMutex);
+
         //Signalling Print    
         pthread_mutex_lock(&bufMutexP);
         pthread_cond_signal(&bufAvailP);
@@ -135,36 +137,34 @@ void* receiveThread(){
 void *sendThread2()
 {
     struct sockaddr_in soutRemote;
-    unsigned int sout_len = sizeof(soutRemote);
     soutRemote.sin_family = AF_INET;
     soutRemote.sin_addr.s_addr = inet_addr(REMOTEIP);
     soutRemote.sin_port = htons(REMOTEPORT);
 
     while (1){
-
         if (ListCount(outMsg) == 0){
             pthread_mutex_lock(&bufMutexT);
             pthread_cond_wait(&bufAvailT, &bufMutexT);
             pthread_mutex_unlock(&bufMutexT);
         }
 
-        pthread_mutex_lock(&outMutex);// localMutex
+        pthread_mutex_lock(&outMutex);
         messageRec = ListTrim(outMsg);
-        pthread_mutex_unlock(&outMutex); // localMutex
+        pthread_mutex_unlock(&outMutex); 
         
         //int returner = sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sout_len);
-        if(sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sout_len) == -1){
+        if(sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){
             printf("Could not send");
             exit(EXIT_FAILURE);
         }
 
-        if(strcmp(messageRec, "!") == 0){  //messagerx has to be coreect dynamic index
+        if(strcmp(messageRec, "!") == 0){ 
             ListFree(outMsg, freeHelper);
             ListFree(inMsg, freeHelper);
-            pthread_cancel(senderPID);
             pthread_cancel(keyboardPID);
-            pthread_cancel(receivePID);
             pthread_cancel(printPID);
+            pthread_cancel(receivePID);
+            pthread_cancel(senderPID);
         }
         free(messageRec);
         messageRec = NULL;
@@ -301,33 +301,33 @@ int main(int argc, char **args)
         messageRec = NULL;
     }
 
-    //Sender_wait_to_finish(); // TODO:
+    //Sender_wait_to_finish(); // :
     pthread_join(senderPID, NULL);
     pthread_mutex_destroy(&bufMutexT);
     pthread_cond_destroy(&bufAvailT);
-    if(messageRec != NULL){
-        free(messageRec);
-        messageRec = NULL;
-    }
+    // if(messageRec != NULL){
+    //     free(messageRec);
+    //     messageRec = NULL;
+    // }
 
     //Receiver_wait_to_finish();
     pthread_join(receivePID,NULL);
     pthread_mutex_destroy(&bufMutexR);
     pthread_cond_destroy(&bufAvailR);
-    if(messageRec != NULL){
-        free(messageRec);
-        messageRec = NULL;
-    }
+    // if(messageRec != NULL){
+    //     free(messageRec);
+    //     messageRec = NULL;
+    // }
 
     //Screen_wait_to_finish();
     //Screen print
     pthread_join(printPID,NULL);
     pthread_mutex_destroy(&bufMutexP);
     pthread_cond_destroy(&bufAvailP);
-    if(messageRec != NULL){
-        free(messageRec);
-        messageRec = NULL;
-    }
+    // if(messageRec != NULL){
+    //     free(messageRec);
+    //     messageRec = NULL;
+    // }
 
 
 
