@@ -195,10 +195,10 @@ void *keyboardThread2()
         // messageRec[strlen(messageRec)-1] = '\0';
 
 ////////////
-        char typeMsg[MSG_MAX_LEN] = malloc(MSG_MAX_LEN);
+        //char typeMsg[MSG_MAX_LEN] = malloc(MSG_MAX_LEN);
         // Read from keyboard
-        int numBytes = read(STDIN_FILENO, &typeMsg, MSG_MAX_LEN);
-        typeMsg[numBytes-1] = '\0';
+        int numBytes = read(STDIN_FILENO, messageRec, MSG_MAX_LEN);
+        messageRec[numBytes-1] = '\0';
 ////////////
         pthread_mutex_lock(&onMutex); //producersMutex
         if (ListCount(outMsg) + ListCount(inMsg) == 100){ // recieve_list = inmSG
