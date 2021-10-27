@@ -132,7 +132,7 @@ void* receiveThread(){
     return NULL;
 }
 
-void *sendThread2(void *unused)
+void *sendThread2()
 {
     struct sockaddr_in soutRemote;
     unsigned int sout_len = sizeof(soutRemote);
@@ -140,42 +140,27 @@ void *sendThread2(void *unused)
     soutRemote.sin_addr.s_addr = inet_addr(REMOTEIP);
     soutRemote.sin_port = htons(REMOTEPORT);
 
-    char end[MSG_MAX_LEN];
-    end[0] = '!';
-    end[strlen(end)] = '\0';
-
     while (1){
 
-        if (ListCount(outMsg) == 0)
-        {
+        if (ListCount(outMsg) == 0){
             pthread_mutex_lock(&bufMutexT);
-            {
-                pthread_cond_wait(&bufAvailT, &bufMutexT);
-            }
+            pthread_cond_wait(&bufAvailT, &bufMutexT);
             pthread_mutex_unlock(&bufMutexT);
         }
 
-        pthread_mutex_lock(&outMutex);
-        {
-            messageRec = ListTrim(outMsg);
-        }
-        pthread_mutex_unlock(&outMutex);
+        pthread_mutex_lock(&outMutex);// localMutex
+        messageRec = ListTrim(outMsg);
+        pthread_mutex_unlock(&outMutex); // localMutex
         
-        int byterx = sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sout_len);
-        if(byterx == -1){
-        printf("sending error to remote");
-        exit(EXIT_FAILURE);
+        //int returner = sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sout_len);
+        if(sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sout_len) == -1){
+            printf("Could not send");
+            exit(EXIT_FAILURE);
         }
-
-        //bool end2 =(messageRx[strlen(messageRx)-1] == 'n' && messageRx[strlen(messageRx)-2] == 92 && messageRx[0] == '!') && strlen(messageRx) == 3 ;
 
         if(strcmp(messageRec, "!") == 0){  //messagerx has to be coreect dynamic index
             ListFree(outMsg, freeHelper);
             ListFree(inMsg, freeHelper);
-            //keyboard_shutdown();
-            //Screen_shutdown();
-            //Receiver_shutdown();
-            //Sender_shutdown();
             pthread_cancel(senderPID);
             pthread_cancel(keyboardPID);
             pthread_cancel(receivePID);
@@ -197,32 +182,25 @@ void *sendThread2(void *unused)
     return NULL;
 }
 
-void *keyboardThread2(void *unused)
+void *keyboardThread2()
 {
     while (1){
         messageRec = malloc(MSG_MAX_LEN);
         fgets(messageRec,MSG_MAX_LEN, stdin); //messagerx has to be coreect dynamic index
 
-        //
         messageRec[strlen(messageRec)-1] = '\0';
-        pthread_mutex_lock(&onMutex);
-        {
-            if (ListCount(outMsg) + ListCount(inMsg) == 100){ // recieve_list = inmSG
-                    pthread_mutex_lock(&bufMutexB);
-                    {
-                        pthread_cond_wait(&bufAvailB,&bufMutexB);
-                    }
-                    pthread_mutex_unlock(&bufMutexB);
-            }
-        }
-        pthread_mutex_unlock(&onMutex);// producer
 
-        pthread_mutex_lock(&outMutex);
-        {
-
-            ListPrepend(outMsg,messageRec);
+        pthread_mutex_lock(&onMutex); //producersMutex
+        if (ListCount(outMsg) + ListCount(inMsg) == 100){ // recieve_list = inmSG
+            pthread_mutex_lock(&bufMutexB);
+            pthread_cond_wait(&bufAvailB,&bufMutexB);
+            pthread_mutex_unlock(&bufMutexB);
         }
-        pthread_mutex_unlock(&outMutex); 
+        pthread_mutex_unlock(&onMutex);// producersMutex
+
+        pthread_mutex_lock(&outMutex); // localMutex
+        ListPrepend(outMsg,messageRec);
+        pthread_mutex_unlock(&outMutex); // localMutex
 
         //signal_consumer_sender();
         pthread_mutex_lock(&bufMutexT);
@@ -232,7 +210,6 @@ void *keyboardThread2(void *unused)
     }
     return NULL;
 }
-
 
 static void bindSocket()
 {
@@ -306,15 +283,13 @@ int main(int argc, char **args)
     inMsg = ListCreate();
     
 
-    //keyboard_init(outMsg,inMsg,&outMutex,&onMutex);
-    pthread_create(&keyboardPID, NULL, keyboardThread2, NULL);
-
-    //Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR,&bufAvailR,&receivePID,&printPID, &keyboardPID, &bufMutexB, &bufAvailB);
-    pthread_create(&senderPID, NULL, sendThread2, NULL);
+    //keyboard_init(outMsg,inMsg,&outMutex,&onMutex);    
+    //Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR);
     //Receiver_init(sDr,outMsg,inMsg,&inMutex,&onMutex);
-    pthread_create(&receivePID,NULL,receiveThread,NULL);
-    
     //Screen_init(sDr,outMsg,inMsg,&inMutex,&bufMutexR,&bufAvailR,&receivePID);
+    pthread_create(&keyboardPID, NULL, keyboardThread2, NULL);
+    pthread_create(&senderPID, NULL, sendThread2, NULL);
+    pthread_create(&receivePID,NULL,receiveThread,NULL);
     pthread_create(&printPID,NULL,printThread,NULL);
 
      //Keyboard_wait_to_finish();
@@ -345,7 +320,7 @@ int main(int argc, char **args)
     }
 
     //Screen_wait_to_finish();
-    //Screen
+    //Screen print
     pthread_join(printPID,NULL);
     pthread_mutex_destroy(&bufMutexP);
     pthread_cond_destroy(&bufAvailP);
