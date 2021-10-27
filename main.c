@@ -195,7 +195,7 @@ void *keyboardThread2()
         // messageRec[strlen(messageRec)-1] = '\0';
 
 ////////////
-        char typeMsg[MSG_MAX_LEN];
+        char typeMsg[MSG_MAX_LEN] = malloc(MSG_MAX_LEN);
         // Read from keyboard
         int numBytes = read(STDIN_FILENO, &typeMsg, MSG_MAX_LEN);
         typeMsg[numBytes-1] = '\0';
