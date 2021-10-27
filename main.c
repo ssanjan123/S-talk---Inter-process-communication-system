@@ -55,7 +55,7 @@ void freeHelper(void *item){
 }
 void* printThread(){
     while(1){
-        if(ListCount(inMsg) <= 0){
+        if(ListCount(inMsg) == 0){
             pthread_mutex_lock(&bufMutexP);
             pthread_cond_wait(&bufAvailP,&bufMutexP);
             pthread_mutex_unlock(&bufMutexP);
@@ -110,7 +110,7 @@ void* receiveThread(){
         }
 
         //NULL terminate the message received
-        messageRec[strlen(messageRec)] = '\0';
+        messageRec[strlen(messageRec)] = '\0'; // test
 
         //Critical section for receive
         pthread_mutex_lock(&onMutex);
@@ -122,7 +122,7 @@ void* receiveThread(){
         pthread_mutex_unlock(&onMutex);
 
         pthread_mutex_lock(&inMutex);
-        ListPrepend(inMsg,messageRec);
+        ListPrepend(outMsg,messageRec);// was inMsg instead of outMsg
         pthread_mutex_unlock(&inMutex);
         //Signalling Print    
         pthread_mutex_lock(&bufMutexP);
