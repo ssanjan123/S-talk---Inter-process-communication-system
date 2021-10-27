@@ -209,7 +209,7 @@ void *keyboardThread2()
         pthread_mutex_unlock(&onMutex);// producersMutex
 
         pthread_mutex_lock(&outMutex); 
-        ListPrepend(outMsg,typeMsg);// replaced messageRec with typeMsg
+        ListPrepend(outMsg,messageRec);// replaced messageRec with typeMsg
         pthread_mutex_unlock(&outMutex);
 
         //signal_consumer_sender();
