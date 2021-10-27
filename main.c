@@ -14,6 +14,7 @@
 
 #define MSG_MAX_LEN 1024
 #define LIST_MAX_SIZE 100
+//static int endOfMsg = 0;
 
 
 static int LOCALPORT;
@@ -63,16 +64,19 @@ void* printThread(){
         pthread_mutex_lock(&inMutex);
         messageRec = ListTrim(inMsg);
         pthread_mutex_unlock(&inMutex);
+
         //Signalling Receiver
         pthread_mutex_lock(&bufMutexR);
         pthread_cond_signal(&bufAvailR);
         pthread_mutex_unlock(&bufMutexR);
 
+        //signal_producer_keyboard();
         pthread_mutex_lock(&bufMutexB);
         pthread_cond_signal(&bufAvailB);
         pthread_mutex_unlock(&bufMutexB);
-        //signal_producer_keyboard();
-        puts(messageRec);
+        
+        //puts(messageRec);
+        printf("Message: %s\n", messageRec);
 
         //End condition
         if(strcmp(messageRec,"!") == 0){
@@ -186,10 +190,16 @@ void *keyboardThread2()
 {
     while (1){
         messageRec = malloc(MSG_MAX_LEN);
-        fgets(messageRec,MSG_MAX_LEN, stdin); //messagerx has to be coreect dynamic index
+        fgets(messageRec,MSG_MAX_LEN, stdin); 
 
         messageRec[strlen(messageRec)-1] = '\0';
 
+////////////
+        char typeMsg[MSG_MAX_LEN];
+        // Read from keyboard
+        int numBytes = read(STDIN_FILENO, &typeMsg, MSG_MAX_LEN);
+        typeMsg[numBytes-1] = '\0';
+////////////
         pthread_mutex_lock(&onMutex); //producersMutex
         if (ListCount(outMsg) + ListCount(inMsg) == 100){ // recieve_list = inmSG
             pthread_mutex_lock(&bufMutexB);
@@ -198,9 +208,9 @@ void *keyboardThread2()
         }
         pthread_mutex_unlock(&onMutex);// producersMutex
 
-        pthread_mutex_lock(&outMutex); // localMutex
-        ListPrepend(outMsg,messageRec);
-        pthread_mutex_unlock(&outMutex); // localMutex
+        pthread_mutex_lock(&outMutex); 
+        ListPrepend(outMsg,typeMsg);// replaced messageRec with typeMsg
+        pthread_mutex_unlock(&outMutex);
 
         //signal_consumer_sender();
         pthread_mutex_lock(&bufMutexT);
