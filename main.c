@@ -190,9 +190,9 @@ void *keyboardThread2()
 {
     while (1){
         messageRec = malloc(MSG_MAX_LEN);
-        fgets(messageRec,MSG_MAX_LEN, stdin); 
+        // fgets(messageRec,MSG_MAX_LEN, stdin); 
 
-        messageRec[strlen(messageRec)-1] = '\0';
+        // messageRec[strlen(messageRec)-1] = '\0';
 
 ////////////
         char typeMsg[MSG_MAX_LEN];
