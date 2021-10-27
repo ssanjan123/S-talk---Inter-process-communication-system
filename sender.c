@@ -78,9 +78,9 @@ void *sendThread(void *unused)
         exit(EXIT_FAILURE);
         }
 
-        bool end2 =(messageRx[strlen(messageRx)-1] == 'n' && messageRx[strlen(messageRx)-2] == 92 && messageRx[0] == '!') && strlen(messageRx) == 3 ;
+        //bool end2 =(messageRx[strlen(messageRx)-1] == 'n' && messageRx[strlen(messageRx)-2] == 92 && messageRx[0] == '!') && strlen(messageRx) == 3 ;
 
-        if(strcmp(messageRx, end) == 0 || end2){  //messagerx has to be coreect dynamic index
+        if(strcmp(messageRx, '!') == 0 ){  //messagerx has to be coreect dynamic index
             ListFree(send_list, free_item1);
             ListFree(receive_list, free_item1);
             //keyboard_shutdown();
@@ -98,12 +98,9 @@ void *sendThread(void *unused)
         pthread_cond_signal(bufAvailB);
         pthread_mutex_unlock(bufMutexB);
 
-
         pthread_mutex_lock(TbufMutexR);
         pthread_cond_signal(TbufAvailR);
         pthread_mutex_unlock(TbufMutexR);
-
-    
     }
     return NULL;
 }

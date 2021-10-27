@@ -1,12 +1,12 @@
 #include <stdlib.h>
 #include <netdb.h>
-//#include "list.h"
+#include "list.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
 //#include "keyboard.h"
-#include "sender.h"
+//#include "sender.h"
 //#include "screen.h"
 //#include "receiver.h"
 #include <pthread.h> 
@@ -41,11 +41,14 @@ static pthread_cond_t  bufAvailP = PTHREAD_COND_INITIALIZER;
 
 //For Reading
 static pthread_t keyboardPID;
-
-// static pthread_mutex_t *localMutex;
-// static pthread_mutex_t *producersMutex;
 static pthread_mutex_t bufMutexB = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailB = PTHREAD_COND_INITIALIZER;
+
+//For sending
+static pthread_t senderPID;
+static pthread_mutex_t bufMutexT = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  bufAvailT = PTHREAD_COND_INITIALIZER;
+
 
 void freeHelper(void *item){
     free(item);
@@ -76,8 +79,9 @@ void* printThread(){
             ListFree(outMsg,freeHelper);
             ListFree(inMsg,freeHelper);
             //keyboard_shutdown();
-            Sender_shutdown();
+            //Sender_shutdown();
             //Receiver_shutdown();
+            pthread_cancel(senderPID);
             pthread_cancel(keyboardPID);
             pthread_cancel(receivePID);
             pthread_cancel(printPID);
@@ -93,11 +97,9 @@ void* printThread(){
 void* receiveThread(){
 //////////////////////////////////////////////////////
  //Check this  
-
     struct sockaddr_in sinRemote;
     unsigned int sin_len = sizeof(sinRemote);
-    while(1){
-        
+    while(1){      
         messageRec = malloc(MSG_MAX_LEN);
         int bytes = recvfrom(sDr, messageRec, 
         MSG_MAX_LEN, 0, (struct sockaddr *) &sinRemote, &sin_len);
@@ -122,15 +124,76 @@ void* receiveThread(){
         pthread_mutex_lock(&inMutex);
         ListPrepend(inMsg,messageRec);
         pthread_mutex_unlock(&inMutex);
-
         //Signalling Print    
         pthread_mutex_lock(&bufMutexP);
         pthread_cond_signal(&bufAvailP);
         pthread_mutex_unlock(&bufMutexP);
-
-
     }
+    return NULL;
+}
 
+void *sendThread2(void *unused)
+{
+    struct sockaddr_in soutRemote;
+    unsigned int sout_len = sizeof(soutRemote);
+    soutRemote.sin_family = AF_INET;
+    soutRemote.sin_addr.s_addr = inet_addr(REMOTEIP);
+    soutRemote.sin_port = htons(REMOTEPORT);
+
+    char end[MSG_MAX_LEN];
+    end[0] = '!';
+    end[strlen(end)] = '\0';
+
+    while (1){
+
+        if (ListCount(outMsg) == 0)
+        {
+            pthread_mutex_lock(&bufMutexT);
+            {
+                pthread_cond_wait(&bufAvailT, &bufMutexT);
+            }
+            pthread_mutex_unlock(&bufMutexT);
+        }
+
+        pthread_mutex_lock(&outMutex);
+        {
+            messageRec = ListTrim(outMsg);
+        }
+        pthread_mutex_unlock(&outMutex);
+        
+        int byterx = sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sout_len);
+        if(byterx == -1){
+        printf("sending error to remote");
+        exit(EXIT_FAILURE);
+        }
+
+        //bool end2 =(messageRx[strlen(messageRx)-1] == 'n' && messageRx[strlen(messageRx)-2] == 92 && messageRx[0] == '!') && strlen(messageRx) == 3 ;
+
+        if(strcmp(messageRec, "!") == 0){  //messagerx has to be coreect dynamic index
+            ListFree(outMsg, freeHelper);
+            ListFree(inMsg, freeHelper);
+            //keyboard_shutdown();
+            //Screen_shutdown();
+            //Receiver_shutdown();
+            //Sender_shutdown();
+            pthread_cancel(senderPID);
+            pthread_cancel(keyboardPID);
+            pthread_cancel(receivePID);
+            pthread_cancel(printPID);
+        }
+        free(messageRec);
+        messageRec = NULL;
+        //signal_producer_keyboard();
+        pthread_mutex_lock(&bufMutexB);
+        pthread_cond_signal(&bufAvailB);
+        pthread_mutex_unlock(&bufMutexB);
+
+        //signal_producer_receiver();
+        pthread_mutex_lock(&bufMutexR);
+        pthread_cond_signal(&bufAvailR);
+        pthread_mutex_unlock(&bufMutexR);
+    
+    }
     return NULL;
 }
 
@@ -160,11 +223,16 @@ void *keyboardThread2(void *unused)
             ListPrepend(outMsg,messageRec);
         }
         pthread_mutex_unlock(&outMutex); 
-        signal_consumer_sender();
+
+        //signal_consumer_sender();
+        pthread_mutex_lock(&bufMutexT);
+        pthread_cond_signal(&bufAvailT);
+        pthread_mutex_unlock(&bufMutexT);
         
     }
     return NULL;
 }
+
 
 static void bindSocket()
 {
@@ -237,17 +305,17 @@ int main(int argc, char **args)
     outMsg = ListCreate();
     inMsg = ListCreate();
     
-    
 
     //keyboard_init(outMsg,inMsg,&outMutex,&onMutex);
     pthread_create(&keyboardPID, NULL, keyboardThread2, NULL);
 
-    Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR,&bufAvailR,&receivePID,&printPID, &keyboardPID, &bufMutexB, &bufAvailB);
+    //Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR,&bufAvailR,&receivePID,&printPID, &keyboardPID, &bufMutexB, &bufAvailB);
+    pthread_create(&senderPID, NULL, sendThread2, NULL);
     //Receiver_init(sDr,outMsg,inMsg,&inMutex,&onMutex);
     pthread_create(&receivePID,NULL,receiveThread,NULL);
-    pthread_create(&printPID,NULL,printThread,NULL);
+    
     //Screen_init(sDr,outMsg,inMsg,&inMutex,&bufMutexR,&bufAvailR,&receivePID);
-
+    pthread_create(&printPID,NULL,printThread,NULL);
 
      //Keyboard_wait_to_finish();
     pthread_join(keyboardPID,NULL);
@@ -258,8 +326,15 @@ int main(int argc, char **args)
         messageRec = NULL;
     }
 
+    //Sender_wait_to_finish(); // TODO:
+    pthread_join(senderPID, NULL);
+    pthread_mutex_destroy(&bufMutexT);
+    pthread_cond_destroy(&bufAvailT);
+    if(messageRec != NULL){
+        free(messageRec);
+        messageRec = NULL;
+    }
 
-    Sender_wait_to_finish(); // TODO:
     //Receiver_wait_to_finish();
     pthread_join(receivePID,NULL);
     pthread_mutex_destroy(&bufMutexR);
