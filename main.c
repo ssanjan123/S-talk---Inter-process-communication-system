@@ -5,10 +5,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
-//#include "keyboard.h"
-//#include "sender.h"
-//#include "screen.h"
-//#include "receiver.h"
 #include <pthread.h> 
 
 #define MSG_MAX_LEN 1024
@@ -22,14 +18,14 @@ LIST *outMsg;
 LIST *inMsg;
 
 
-pthread_mutex_t outMutex = PTHREAD_MUTEX_INITIALIZER; // local
-pthread_mutex_t inMutex = PTHREAD_MUTEX_INITIALIZER; // remote
-pthread_mutex_t onMutex = PTHREAD_MUTEX_INITIALIZER; // producer
+pthread_mutex_t outMutex = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t inMutex = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t onMutex = PTHREAD_MUTEX_INITIALIZER; 
 
-static char* messageRec1 = NULL;// printing
-static char* messageRec2 = NULL;// recievinh
-static char* messageRec3 = NULL;// keybaord
-static char* messageRec4 = NULL; // sending
+static char* messagePrint = NULL;
+static char* messageRecieve = NULL;
+static char* messageSend = NULL;
+static char* messageRead = NULL; 
 
 //For Receiving
 static pthread_t receivePID;
@@ -42,14 +38,14 @@ static pthread_mutex_t bufMutexP = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailP = PTHREAD_COND_INITIALIZER;
 
 //For Reading
-static pthread_t keyboardPID;
-static pthread_mutex_t bufMutexB = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  bufAvailB = PTHREAD_COND_INITIALIZER;
+static pthread_t readingPID;
+static pthread_mutex_t bufMutexRead = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  bufAvailRead = PTHREAD_COND_INITIALIZER;
 
 //For sending
 static pthread_t senderPID;
-static pthread_mutex_t bufMutexT = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  bufAvailT = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t bufMutexS = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  bufAvailS = PTHREAD_COND_INITIALIZER;
 
 
 void freeHelper(void *item){
@@ -63,7 +59,7 @@ void* printThread(){
             pthread_mutex_unlock(&bufMutexP);
         }
         pthread_mutex_lock(&inMutex);
-        messageRec1 = ListTrim(inMsg);
+        messagePrint = ListTrim(inMsg);
         pthread_mutex_unlock(&inMutex);
 
         //Signalling Receiver
@@ -71,41 +67,38 @@ void* printThread(){
         pthread_cond_signal(&bufAvailR);
         pthread_mutex_unlock(&bufMutexR);
 
-        //signal_producer_keyboard();
-        pthread_mutex_lock(&bufMutexB);
-        pthread_cond_signal(&bufAvailB);
-        pthread_mutex_unlock(&bufMutexB);
+        //Signalling read
+        pthread_mutex_lock(&bufMutexRead);
+        pthread_cond_signal(&bufAvailRead);
+        pthread_mutex_unlock(&bufMutexRead);
         
-        puts(messageRec1);
+        puts(messagePrint);
 
         //End condition
-        if(strcmp(messageRec1,"!") == 0){
+        if(strcmp(messagePrint,"!") == 0){
             ListFree(outMsg,freeHelper);
             ListFree(inMsg,freeHelper);
-            //keyboard_shutdown();
-            //Sender_shutdown();
-            //Receiver_shutdown();
+
+            // Shutdown the pthreads
             pthread_cancel(senderPID);
-            pthread_cancel(keyboardPID);
+            pthread_cancel(readingPID);
             pthread_cancel(receivePID);
             pthread_cancel(printPID);
 
         }
-        free(messageRec1);
-        messageRec1 = NULL;
+        free(messagePrint);
+        messagePrint = NULL;
 
     }
     return NULL;
 }
 
 void* receiveThread(){
-//////////////////////////////////////////////////////
- //Check this  
     struct sockaddr_in sinRemote;
     unsigned int sin_len = sizeof(sinRemote);
     while(1){      
-        messageRec2 = malloc(MSG_MAX_LEN);
-        int bytes = recvfrom(sDr, messageRec2, 
+        messageRecieve = malloc(MSG_MAX_LEN);
+        int bytes = recvfrom(sDr, messageRecieve, 
         MSG_MAX_LEN, 0, (struct sockaddr *) &sinRemote, &sin_len);
         //Check for error
         if(bytes < 0){//Error check for Receiver
@@ -114,7 +107,7 @@ void* receiveThread(){
         }
 
         //NULL terminate the message received
-        messageRec2[bytes] = '\0';
+        messageRecieve[bytes] = '\0';
 
         //Critical section for receive
         pthread_mutex_lock(&onMutex);
@@ -126,7 +119,7 @@ void* receiveThread(){
         pthread_mutex_unlock(&onMutex);
 
         pthread_mutex_lock(&inMutex);
-        ListPrepend(inMsg,messageRec2);
+        ListPrepend(inMsg,messageRecieve);
         pthread_mutex_unlock(&inMutex);
 
         //Signalling Print    
@@ -137,7 +130,7 @@ void* receiveThread(){
     return NULL;
 }
 
-void *sendThread2()
+void *sendThread()
 {
     struct sockaddr_in soutRemote;
     soutRemote.sin_family = AF_INET;
@@ -146,37 +139,36 @@ void *sendThread2()
 
     while (1){
         if (ListCount(outMsg) == 0){
-            pthread_mutex_lock(&bufMutexT);
-            pthread_cond_wait(&bufAvailT, &bufMutexT);
-            pthread_mutex_unlock(&bufMutexT);
+            pthread_mutex_lock(&bufMutexS);
+            pthread_cond_wait(&bufAvailS, &bufMutexS);
+            pthread_mutex_unlock(&bufMutexS);
         }
 
         pthread_mutex_lock(&outMutex);
-        messageRec4 = ListTrim(outMsg);
+        messageRead = ListTrim(outMsg);
         pthread_mutex_unlock(&outMutex); 
         
-        //int returner = sendto(sDr, messageRec, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sout_len);
-        if(sendto(sDr, messageRec4, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){
+        if(sendto(sDr, messageRead, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){
             printf("Could not send");
             exit(EXIT_FAILURE);
         }
 
-        if(strcmp(messageRec4, "!") == 0){ 
+        if(strcmp(messageRead, "!") == 0){ 
             ListFree(outMsg, freeHelper);
             ListFree(inMsg, freeHelper);
-            pthread_cancel(keyboardPID);
+            pthread_cancel(readingPID);
             pthread_cancel(printPID);
             pthread_cancel(receivePID);
             pthread_cancel(senderPID);
         }
-        free(messageRec4);
-        messageRec4 = NULL;
-        //signal_producer_keyboard();
-        pthread_mutex_lock(&bufMutexB);
-        pthread_cond_signal(&bufAvailB);
-        pthread_mutex_unlock(&bufMutexB);
+        free(messageRead);
+        messageRead = NULL;
+        //Signalling read
+        pthread_mutex_lock(&bufMutexRead);
+        pthread_cond_signal(&bufAvailRead);
+        pthread_mutex_unlock(&bufMutexRead);
 
-        //signal_producer_receiver();
+        //Signaling reciever
         pthread_mutex_lock(&bufMutexR);
         pthread_cond_signal(&bufAvailR);
         pthread_mutex_unlock(&bufMutexR);
@@ -185,32 +177,32 @@ void *sendThread2()
     return NULL;
 }
 
-void *keyboardThread2()
+void *readThread()
 {
     while (1){
-        messageRec3 = malloc(MSG_MAX_LEN);
-        fgets(messageRec3,MSG_MAX_LEN, stdin); 
-        messageRec3[strlen(messageRec3)-1] = '\0';
+        messageSend = malloc(MSG_MAX_LEN);
+        // fgets(messageSend,MSG_MAX_LEN, stdin); 
+        // messageSend[strlen(messageSend)-1] = '\0';
         // Testing with read() instead of fgets
-        // int numBytes = read(STDIN_FILENO, messageRec, MSG_MAX_LEN);
-        // messageRec[numBytes-1] = '\0';
+        int numBytes = read(STDIN_FILENO, messageSend, MSG_MAX_LEN);
+        messageSend[numBytes-1] = '\0';
 
         pthread_mutex_lock(&onMutex); 
         if (ListCount(outMsg) + ListCount(inMsg) == 100){ 
-            pthread_mutex_lock(&bufMutexB);
-            pthread_cond_wait(&bufAvailB,&bufMutexB);
-            pthread_mutex_unlock(&bufMutexB);
+            pthread_mutex_lock(&bufMutexRead);
+            pthread_cond_wait(&bufAvailR,&bufMutexRead);
+            pthread_mutex_unlock(&bufMutexRead);
         }
         pthread_mutex_unlock(&onMutex);
 
         pthread_mutex_lock(&outMutex); 
-        ListPrepend(outMsg,messageRec3);
+        ListPrepend(outMsg,messageSend);
         pthread_mutex_unlock(&outMutex);
 
-        //signal_consumer_sender();
-        pthread_mutex_lock(&bufMutexT);
-        pthread_cond_signal(&bufAvailT);
-        pthread_mutex_unlock(&bufMutexT);
+        //Signalling sender
+        pthread_mutex_lock(&bufMutexS);
+        pthread_cond_signal(&bufAvailS);
+        pthread_mutex_unlock(&bufMutexS);
         
     }
     return NULL;
@@ -287,54 +279,47 @@ int main(int argc, char **args)
     outMsg = ListCreate();
     inMsg = ListCreate();
     
-
-    //keyboard_init(outMsg,inMsg,&outMutex,&onMutex);    
-    //Sender_init(sDr,REMOTEIP,REMOTEPORT,outMsg,inMsg,&outMutex,&bufMutexR);
-    //Receiver_init(sDr,outMsg,inMsg,&inMutex,&onMutex);
-    //Screen_init(sDr,outMsg,inMsg,&inMutex,&bufMutexR,&bufAvailR,&receivePID);
-    pthread_create(&keyboardPID, NULL, keyboardThread2, NULL);
-    pthread_create(&senderPID, NULL, sendThread2, NULL);
+    // Creating main 4 threads
+    pthread_create(&readingPID, NULL, readThread, NULL);
+    pthread_create(&senderPID, NULL, sendThread, NULL);
     pthread_create(&receivePID,NULL,receiveThread,NULL);
     pthread_create(&printPID,NULL,printThread,NULL);
 
-     //Keyboard_wait_to_finish();
-    pthread_join(keyboardPID,NULL);
-    pthread_mutex_destroy(&bufMutexB);
-    pthread_cond_destroy(&bufAvailB);
-    if(messageRec3 != NULL){
-        free(messageRec3);
-        messageRec3 = NULL;
+    // read
+    pthread_join(readingPID,NULL);
+    pthread_mutex_destroy(&bufMutexR);
+    pthread_cond_destroy(&bufAvailR);
+    if(messageSend != NULL){
+        free(messageSend);
+        messageSend = NULL;
     }
 
-    //Sender_wait_to_finish(); // :
+    //Sender
     pthread_join(senderPID, NULL);
-    pthread_mutex_destroy(&bufMutexT);
-    pthread_cond_destroy(&bufAvailT);
-    if(messageRec4 != NULL){
-        free(messageRec4);
-        messageRec4 = NULL;
+    pthread_mutex_destroy(&bufMutexS);
+    pthread_cond_destroy(&bufAvailS);
+    if(messageRead != NULL){
+        free(messageRead);
+        messageRead = NULL;
     }
 
-    //Receiver_wait_to_finish();
+    //Recieve
     pthread_join(receivePID,NULL);
     pthread_mutex_destroy(&bufMutexR);
     pthread_cond_destroy(&bufAvailR);
-    if(messageRec2 != NULL){
-        free(messageRec2);
-        messageRec2 = NULL;
+    if(messageRecieve != NULL){
+        free(messageRecieve);
+        messageRecieve = NULL;
     }
 
-    //Screen_wait_to_finish();
     //Screen print
     pthread_join(printPID,NULL);
     pthread_mutex_destroy(&bufMutexP);
     pthread_cond_destroy(&bufAvailP);
-    if(messageRec1 != NULL){
-        free(messageRec1);
-        messageRec1 = NULL;
+    if(messagePrint != NULL){
+        free(messagePrint);
+        messagePrint = NULL;
     }
-
-
 
     pthread_mutex_destroy(&outMutex);
     pthread_mutex_destroy(&inMutex);
