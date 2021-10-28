@@ -10,7 +10,7 @@
 #define MSG_MAX_LEN 1024
 #define LIST_MAX_SIZE 100
 
-//Ports and IP of peers
+//Ports and IP of other connection
 static int myPort;
 static int theirPort;
 static char* theirIP;
@@ -38,28 +38,26 @@ static char* messageRead = NULL;
 static pthread_t receivePID;
 static pthread_mutex_t bufMutexR = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailR = PTHREAD_COND_INITIALIZER;
-//Thread initialization
 //For Printing
 static pthread_t printPID;
 static pthread_mutex_t bufMutexP = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailP = PTHREAD_COND_INITIALIZER;
-//Thread initialization
 //For Reading
 static pthread_t readingPID;
 static pthread_mutex_t bufMutexRead = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailRead = PTHREAD_COND_INITIALIZER;
-//Thread initialization
 //For sending
 static pthread_t senderPID;
 static pthread_mutex_t bufMutexS = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailS = PTHREAD_COND_INITIALIZER;
 
-
 void freeHelper(void *item){
-    free(item);
+    //free(item);
+    item = NULL;
 }
 void* printThread(){
     while(1){
+        char* print;
         //Critical Section
         //Check to see if input list is empty 
         if(ListCount(inMsg) == 0){
@@ -70,7 +68,8 @@ void* printThread(){
 
         //Global Mutex (in use)
         pthread_mutex_lock(&inMutex);
-        messagePrint = ListTrim(inMsg);
+        //messagePrint = ListTrim(inMsg);
+        print = ListTrim(inMsg);
         pthread_mutex_unlock(&inMutex);
 
         //Signalling receiver
@@ -86,7 +85,8 @@ void* printThread(){
         printf("%s\n",messagePrint);
 
         //End condition
-        if(strcmp(messagePrint,"!") == 0){
+        //if(strcmp(messagePrint,"!") == 0){//
+        if(strcmp(print, "!") == 0){
             ListFree(outMsg,freeHelper);
             ListFree(inMsg,freeHelper);
 
@@ -97,7 +97,7 @@ void* printThread(){
             pthread_cancel(printPID);
 
         }
-        free(messagePrint);
+        //free(messagePrint);
         messagePrint = NULL;
 
     }
@@ -105,20 +105,24 @@ void* printThread(){
 }
 
 void* receiveThread(){
+    char receive[MSG_MAX_LEN];
+
+
     struct sockaddr_in sinRemote;
     unsigned int sin_len = sizeof(sinRemote);
     while(1){      
         messageRecieve = malloc(MSG_MAX_LEN);
-        int bytes = recvfrom(sDr, messageRecieve, 
-        MSG_MAX_LEN, 0, (struct sockaddr *) &sinRemote, &sin_len);
+        int bytes = recvfrom(sDr, &receive, 
+        MSG_MAX_LEN, 0, (struct sockaddr *) &sinRemote, &sin_len); // changed &receive from messageRecieve
         //Check for error
-        if(bytes < 0){//Error check for Receiver
+        if(bytes < 0){
             printf("Error in receiving!\n");
             exit(EXIT_FAILURE);
         }
 
         //NULL terminate the message received
-        messageRecieve[bytes] = '\0';
+        //messageRecieve[bytes] = '\0';
+        receive[bytes] = '\0';
 
         //Critical section for receive
         //Check to see if lists are full
@@ -132,7 +136,8 @@ void* receiveThread(){
 
         //Global Mutex (in use)
         pthread_mutex_lock(&inMutex);
-        ListPrepend(inMsg,messageRecieve);
+        //ListPrepend(inMsg,messageRecieve);
+        ListPrepend(inMsg, receive);
         pthread_mutex_unlock(&inMutex);
 
         //Signalling Print    
@@ -145,13 +150,15 @@ void* receiveThread(){
 
 void *sendThread()
 {
+    char* send;
+
+
     struct sockaddr_in soutRemote;
     soutRemote.sin_family = AF_INET;
     soutRemote.sin_addr.s_addr = inet_addr(theirIP);
     soutRemote.sin_port = htons(theirPort);
 
     while (1){
-
         //Critical Section
         //Check to see if output list is empty 
         if (ListCount(outMsg) == 0){
@@ -161,7 +168,8 @@ void *sendThread()
         }
         //Global Mutex (in use)
         pthread_mutex_lock(&outMutex);
-        messageRead = ListTrim(outMsg);
+        //messageRead = ListTrim(outMsg);
+        send = ListTrim(outMsg);
         pthread_mutex_unlock(&outMutex); 
         
         if(sendto(sDr, messageRead, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){
@@ -169,7 +177,8 @@ void *sendThread()
             exit(EXIT_FAILURE);
         }
         //Checking for termination
-        if(strcmp(messageRead, "!") == 0){ 
+        //if(strcmp(messageRead, "!") == 0){ 
+        if(strcmp(send, "!") == 0){ 
             ListFree(outMsg, freeHelper);
             ListFree(inMsg, freeHelper);
             pthread_cancel(readingPID);
@@ -177,7 +186,7 @@ void *sendThread()
             pthread_cancel(receivePID);
             pthread_cancel(senderPID);
         }
-        free(messageRead);
+        //free(messageRead);
         messageRead = NULL;
         //Signalling read
         pthread_mutex_lock(&bufMutexRead);
@@ -196,9 +205,11 @@ void *sendThread()
 void *readThread()
 {
     while (1){
-        messageSend = malloc(MSG_MAX_LEN);
-        int numBytes = read(STDIN_FILENO, messageSend, MSG_MAX_LEN);
-        messageSend[numBytes-1] = '\0';
+         char bob[MSG_MAX_LEN];
+
+        //messageSend = malloc(MSG_MAX_LEN);
+        int numBytes = read(STDIN_FILENO, bob, MSG_MAX_LEN);
+        messageSend[numBytes-1] = '\0'; // changed bob from messageSend
         
         //Critical Section
         //Check to see if lists are full
@@ -211,14 +222,14 @@ void *readThread()
         pthread_mutex_unlock(&onMutex);
         //Global Mutex (in use) 
         pthread_mutex_lock(&outMutex); 
-        ListPrepend(outMsg,messageSend);
+        //ListPrepend(outMsg,messageSend);
+        ListPrepend(outMsg,bob);
         pthread_mutex_unlock(&outMutex);
 
         //Signalling sender
         pthread_mutex_lock(&bufMutexS);
         pthread_cond_signal(&bufAvailS);
         pthread_mutex_unlock(&bufMutexS);
-        
     }
     return NULL;
 }
@@ -248,7 +259,6 @@ static void setIP(char *remote_name, char *remote_port)
 	struct addrinfo hints; 
     struct addrinfo *result, *rp;
     struct sockaddr_in *sockinfo;
-    char *ip;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -266,8 +276,7 @@ static void setIP(char *remote_name, char *remote_port)
 		if (rp->ai_addr->sa_family == AF_INET)
 		{
 			sockinfo = (struct sockaddr_in *)rp->ai_addr;
-			ip = inet_ntoa(sockinfo->sin_addr);
-            theirIP = ip;
+			theirIP = inet_ntoa(sockinfo->sin_addr);
 			freeaddrinfo(result);
 			return;
 		}
@@ -301,7 +310,7 @@ int main(int argc, char **argv)
     pthread_mutex_destroy(&bufMutexR);
     pthread_cond_destroy(&bufAvailR);
     if(messageSend != NULL){
-        free(messageSend);
+        //free(messageSend);
         messageSend = NULL;
     }
 
@@ -310,7 +319,7 @@ int main(int argc, char **argv)
     pthread_mutex_destroy(&bufMutexS);
     pthread_cond_destroy(&bufAvailS);
     if(messageRead != NULL){
-        free(messageRead);
+        //free(messageRead);
         messageRead = NULL;
     }
 
@@ -319,7 +328,7 @@ int main(int argc, char **argv)
     pthread_mutex_destroy(&bufMutexR);
     pthread_cond_destroy(&bufAvailR);
     if(messageRecieve != NULL){
-        free(messageRecieve);
+        //free(messageRecieve);
         messageRecieve = NULL;
     }
 
@@ -328,7 +337,7 @@ int main(int argc, char **argv)
     pthread_mutex_destroy(&bufMutexP);
     pthread_cond_destroy(&bufAvailP);
     if(messagePrint != NULL){
-        free(messagePrint);
+        //free(messagePrint);
         messagePrint = NULL;
     }
 
