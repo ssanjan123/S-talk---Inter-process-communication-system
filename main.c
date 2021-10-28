@@ -173,7 +173,7 @@ void *sendThread()
         send = ListTrim(outMsg);
         pthread_mutex_unlock(&outMutex); 
         
-        if(sendto(sDr, messageRead, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){
+        if(sendto(sDr, send, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){// changed send from messageRead
             printf("Could not send");
             exit(EXIT_FAILURE);
         }
@@ -209,8 +209,10 @@ void *readThread()
          char bob[MSG_MAX_LEN];
 
         //messageSend = malloc(MSG_MAX_LEN);
-        int numBytes = read(STDIN_FILENO, bob, MSG_MAX_LEN);
-        messageSend[numBytes-1] = '\0'; // changed bob from messageSend
+        int numBytes = read(STDIN_FILENO, bob, MSG_MAX_LEN);// changed bob from messageSend
+        //messageSend[numBytes-1] = '\0'; 
+        bob[numBytes - 1] = '\0';
+
         
         //Critical Section
         //Check to see if lists are full
