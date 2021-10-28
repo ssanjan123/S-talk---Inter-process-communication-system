@@ -18,7 +18,7 @@ static char* theirIP;
 //Socket Descriptor for sockets
 int sDr;
 
-//List for sending and receiving messages
+//Lists for sending and receiving messages
 LIST *outMsg;
 LIST *inMsg;
 
@@ -26,12 +26,6 @@ LIST *inMsg;
 pthread_mutex_t outMutex = PTHREAD_MUTEX_INITIALIZER; 
 pthread_mutex_t inMutex = PTHREAD_MUTEX_INITIALIZER; 
 pthread_mutex_t onMutex = PTHREAD_MUTEX_INITIALIZER; 
-
-//Strings of messages for each thread in use
-static char* messagePrint = NULL;
-static char* messageRecieve = NULL;
-static char* messageSend = NULL;
-static char* messageRead = NULL; 
 
 //Thread initialization
 //For Receiving
@@ -51,15 +45,14 @@ static pthread_t senderPID;
 static pthread_mutex_t bufMutexS = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  bufAvailS = PTHREAD_COND_INITIALIZER;
 
+//Helper function for the ListFree() function in list.h
 void freeHelper(void *item){
-    //free(item);
     item = NULL;
 }
 void* printThread(){
     while(1){
-        char* print;
-        //Critical Section
-        //Check to see if input list is empty 
+        char* printArr;
+        //Critical Section: Check to see if input list is empty 
         if(ListCount(inMsg) == 0){
             pthread_mutex_lock(&bufMutexP);
             pthread_cond_wait(&bufAvailP,&bufMutexP);
@@ -68,8 +61,7 @@ void* printThread(){
 
         //Global Mutex (in use)
         pthread_mutex_lock(&inMutex);
-        //messagePrint = ListTrim(inMsg);
-        print = ListTrim(inMsg);
+        printArr = ListTrim(inMsg);
         pthread_mutex_unlock(&inMutex);
 
         //Signalling receiver
@@ -82,39 +74,32 @@ void* printThread(){
         pthread_cond_signal(&bufAvailRead);
         pthread_mutex_unlock(&bufMutexRead);
         
-        //printf("%s\n",messagePrint);
-        printf("%s\n",print);
+        // Print recieved message to terminal
+        printf("%s\n",printArr);
 
         //End condition
-        //if(strcmp(messagePrint,"!") == 0){//
-        if(strcmp(print, "!") == 0){
+        if(strcmp(printArr, "!") == 0){
             ListFree(outMsg,freeHelper);
             ListFree(inMsg,freeHelper);
-
-            // Shutdown the pthreads
+            // Shutdown all pthreads
             pthread_cancel(senderPID);
             pthread_cancel(readingPID);
             pthread_cancel(receivePID);
             pthread_cancel(printPID);
 
         }
-        //free(messagePrint);
-        messagePrint = NULL;
-
+        printArr = NULL;
     }
     return NULL;
 }
 
 void* receiveThread(){
-    char receive[MSG_MAX_LEN];
-
-
     struct sockaddr_in sinRemote;
     unsigned int sin_len = sizeof(sinRemote);
-    while(1){      
-        messageRecieve = malloc(MSG_MAX_LEN);
-        int bytes = recvfrom(sDr, &receive, 
-        MSG_MAX_LEN, 0, (struct sockaddr *) &sinRemote, &sin_len); // changed &receive from messageRecieve
+    while(1){
+        char receiveArr[MSG_MAX_LEN];      
+        int bytes = recvfrom(sDr, &receiveArr, 
+        MSG_MAX_LEN, 0, (struct sockaddr *) &sinRemote, &sin_len);
         //Check for error
         if(bytes < 0){
             printf("Error in receiving!\n");
@@ -122,10 +107,9 @@ void* receiveThread(){
         }
 
         //NULL terminate the message received
-        //messageRecieve[bytes] = '\0';
-        receive[bytes] = '\0';
+        receiveArr[bytes] = '\0';
 
-        //Critical section for receive
+        //Critical section for receiveArr
         //Check to see if lists are full
         pthread_mutex_lock(&onMutex);
         if((ListCount(outMsg) + ListCount(inMsg)) == LIST_MAX_SIZE){
@@ -137,8 +121,7 @@ void* receiveThread(){
 
         //Global Mutex (in use)
         pthread_mutex_lock(&inMutex);
-        //ListPrepend(inMsg,messageRecieve);
-        ListPrepend(inMsg, receive);
+        ListPrepend(inMsg, receiveArr);
         pthread_mutex_unlock(&inMutex);
 
         //Signalling Print    
@@ -151,35 +134,32 @@ void* receiveThread(){
 
 void *sendThread()
 {
-    char* send;
-
-
     struct sockaddr_in soutRemote;
     soutRemote.sin_family = AF_INET;
     soutRemote.sin_addr.s_addr = inet_addr(theirIP);
     soutRemote.sin_port = htons(theirPort);
 
     while (1){
-        //Critical Section
-        //Check to see if output list is empty 
+        char* sendArr;
+        //Critical Section: Check to see if output list is empty 
         if (ListCount(outMsg) == 0){
             pthread_mutex_lock(&bufMutexS);
             pthread_cond_wait(&bufAvailS, &bufMutexS);
             pthread_mutex_unlock(&bufMutexS);
         }
+
         //Global Mutex (in use)
         pthread_mutex_lock(&outMutex);
-        //messageRead = ListTrim(outMsg);
-        send = ListTrim(outMsg);
+        sendArr = ListTrim(outMsg);
         pthread_mutex_unlock(&outMutex); 
         
-        if(sendto(sDr, send, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){// changed send from messageRead
-            printf("Could not send");
+        if(sendto(sDr, sendArr, MSG_MAX_LEN, 0, (struct sockaddr *)&soutRemote, sizeof(soutRemote)) == -1){
+            printf("Could not sendArr");
             exit(EXIT_FAILURE);
         }
+
         //Checking for termination
-        //if(strcmp(messageRead, "!") == 0){ 
-        if(strcmp(send, "!") == 0){ 
+        if(strcmp(sendArr, "!") == 0){ 
             ListFree(outMsg, freeHelper);
             ListFree(inMsg, freeHelper);
             pthread_cancel(readingPID);
@@ -187,8 +167,8 @@ void *sendThread()
             pthread_cancel(receivePID);
             pthread_cancel(senderPID);
         }
-        //free(messageRead);
-        messageRead = NULL;
+        sendArr = NULL;
+
         //Signalling read
         pthread_mutex_lock(&bufMutexRead);
         pthread_cond_signal(&bufAvailRead);
@@ -197,8 +177,7 @@ void *sendThread()
         //Signaling reciever
         pthread_mutex_lock(&bufMutexR);
         pthread_cond_signal(&bufAvailR);
-        pthread_mutex_unlock(&bufMutexR);
-    
+        pthread_mutex_unlock(&bufMutexR);  
     }
     return NULL;
 }
@@ -206,16 +185,11 @@ void *sendThread()
 void *readThread()
 {
     while (1){
-         char bob[MSG_MAX_LEN];
+        char readArr[MSG_MAX_LEN];
+        int numBytes = read(STDIN_FILENO, readArr, MSG_MAX_LEN);
+        readArr[numBytes - 1] = '\0';
 
-        //messageSend = malloc(MSG_MAX_LEN);
-        int numBytes = read(STDIN_FILENO, bob, MSG_MAX_LEN);// changed bob from messageSend
-        //messageSend[numBytes-1] = '\0'; 
-        bob[numBytes - 1] = '\0';
-
-        
-        //Critical Section
-        //Check to see if lists are full
+        //Critical Section: Check to see if lists are full
         pthread_mutex_lock(&onMutex); 
         if (ListCount(outMsg) + ListCount(inMsg) == LIST_MAX_SIZE){ 
             pthread_mutex_lock(&bufMutexRead);
@@ -223,10 +197,10 @@ void *readThread()
             pthread_mutex_unlock(&bufMutexRead);
         }
         pthread_mutex_unlock(&onMutex);
+
         //Global Mutex (in use) 
         pthread_mutex_lock(&outMutex); 
-        //ListPrepend(outMsg,messageSend);
-        ListPrepend(outMsg,bob);
+        ListPrepend(outMsg,readArr);
         pthread_mutex_unlock(&outMutex);
 
         //Signalling sender
@@ -252,7 +226,6 @@ static void bindSocket()
         perror("Binding Socket Failed!");
         exit(EXIT_FAILURE);
     }
-
     return;
 }
 
@@ -291,9 +264,9 @@ static void setIP(char *remote_name, char *remote_port)
 
 int main(int argc, char **argv)
 {
-    
     myPort = atoi(argv[1]);
     theirPort = atoi(argv[3]);
+
     //Sets the IP to a value that corresponds to the machine name
     setIP(argv[2],argv[3]);
     bindSocket();
@@ -312,37 +285,21 @@ int main(int argc, char **argv)
     pthread_join(readingPID,NULL);
     pthread_mutex_destroy(&bufMutexR);
     pthread_cond_destroy(&bufAvailR);
-    if(messageSend != NULL){
-        //free(messageSend);
-        messageSend = NULL;
-    }
 
     //Sender
     pthread_join(senderPID, NULL);
     pthread_mutex_destroy(&bufMutexS);
     pthread_cond_destroy(&bufAvailS);
-    if(messageRead != NULL){
-        //free(messageRead);
-        messageRead = NULL;
-    }
 
     //Recieve
     pthread_join(receivePID,NULL);
     pthread_mutex_destroy(&bufMutexR);
     pthread_cond_destroy(&bufAvailR);
-    if(messageRecieve != NULL){
-        //free(messageRecieve);
-        messageRecieve = NULL;
-    }
 
     //Print
     pthread_join(printPID,NULL);
     pthread_mutex_destroy(&bufMutexP);
     pthread_cond_destroy(&bufAvailP);
-    if(messagePrint != NULL){
-        //free(messagePrint);
-        messagePrint = NULL;
-    }
 
     //Kill all threads currently in use
     pthread_mutex_destroy(&outMutex);
