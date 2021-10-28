@@ -82,7 +82,8 @@ void* printThread(){
         pthread_cond_signal(&bufAvailRead);
         pthread_mutex_unlock(&bufMutexRead);
         
-        printf("%s\n",messagePrint);
+        //printf("%s\n",messagePrint);
+        printf("%s\n",print);
 
         //End condition
         //if(strcmp(messagePrint,"!") == 0){//
