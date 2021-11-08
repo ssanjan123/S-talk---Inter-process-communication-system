@@ -1,4 +1,4 @@
-S-talk
+S-talk - Inter process communication system
 
 To initiate an s-talk session two users will first agree on two things:
 1) The machine that each will be running on
