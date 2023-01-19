@@ -1,6 +1,6 @@
 # S-talk - Inter process communication system
 
-<img src="https://user-images.githubusercontent.com/84153519/213350391-bcfb9cc8-d50c-4200-828a-bc8d27f9d99b.png" width="500" height="300">
+<img src="https://user-images.githubusercontent.com/84153519/213350391-bcfb9cc8-d50c-4200-828a-bc8d27f9d99b.png" width="300" height="300">
 
 S-talk is a system for inter-process communication (IPC) that allows two users to communicate with each other in real-time. The system uses a client-server model, where one user acts as the server and the other acts as the client. 
 
